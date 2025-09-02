@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Visualization Tool</title>
+    <script src="https://kit.fontawesome.com/ed04f67d8c.js" crossorigin="anonymous"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            caret-color: black;
+            box-sizing: border-box;
+        }
+        P,i{
+            color: black;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #93c9ff;
+            overflow: hidden;
+            height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        .toolbar {
+            background: #252121;
+            padding: 20px;
+            border-right: 1px solid #252121;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 100;
+            transition: transform 0.3s ease;
+            width: 200px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            overflow-y: auto;
+        }
+
+        .toolbar.mobile-hidden {
+            transform: translateX(-100%);
+        }
+
+        .toolbar-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 200;
+            background: #000000;
+            border: 1px solid #000000;
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            color: #fff;
+        }
+
+        .node-btn {
+            padding: 12px 16px;
+            border: 1px solid #3fff5f;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #3fff5f;
+            color: #333;
+        }
+
+        .node-btn:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+            box-shadow: 5px 5px 0px white;
+        }
+
+        .clear-btn, .save-btn, .load-btn, .export-btn {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
+            margin-top: 10px;
+        }
+
+        .save-btn {
+            background: #28a745;
+            border-color: #28a745;
+        }
+
+        .load-btn {
+            background: #6f42c1;
+            border-color: #6f42c1;
+        }
+
+        .export-btn {
+            background: #fd7e14;
+            border-color: #fd7e14;
+        }
+
+        .clear-btn:hover {
+            background: #c82333;
+            border-color: #c82333;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #218838;
+            border-color: #218838;
+            color: white;
+        }
+
+        .load-btn:hover {
+            background: #5a32a3;
+            border-color: #5a32a3;
+            color: white;
+        }
+
+        .export-btn:hover {
+            background: #e36209;
+            border-color: #e36209;
+            color: white;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: rgb(0, 0, 0);
+        }
+
+        #canvas {
+            background: rgb(0, 0, 0);
+            cursor: grab;
+            transition: cursor 0.2s;
+        }
+
+        #canvas:active {
+            cursor: grabbing;
+        }
+
+        .node {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: move;
+            user-select: none;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            border: 2px solid #333;
+            background: white;
+            color: #333;
+        }
+
+        .node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .node.dragging {
+            transform: scale(1.1);
+            z-index: 1000;
+        }
+
+        .node.selected {
+            border-color: #ff4757;
+            border-width: 3px;
+            box-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
+        }
+
+        .connection {
+            position: absolute;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
+            border-radius: 2px;
+            transform-origin: left center;
+            pointer-events: none;
+            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .delete-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 16px;
+            display: none;
+            z-index: 1500;
+            backdrop-filter: blur(5px);
+        }
+
+        .preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .preview-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: auto;
+            position: relative;
+        }
+
+        .file-input-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            text-align: center;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+
+        .upload-area.active {
+            display: block;
+        }
+
+        .upload-area:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .upload-area.dragover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .text-input-area {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .text-input-area.active {
+            display: block;
+        }
+
+        .text-input, .number-input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .number-input {
+            min-height: 40px;
+        }
+
+        .add-content-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .add-content-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 30px;
+            color: #999;
+            cursor: pointer;
+            background: none;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 150;
+        }
+
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+            background: white;
+        }
+
+        .delete-btn {
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: rgba(220, 53, 69, 1);
+        }
+
+        .content-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            max-width: 300px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 150;
+            display: none;
+            color: #333;
+        }
+
+        .content-info.show {
+            display: block;
+        }
+
+        .content-info h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .content-preview {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .toolbar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                width: 250px;
+                border-radius: 0 15px 15px 0;
+                padding-top: 70px;
+            }
+
+            .toolbar-toggle {
+                display: block;
+            }
+
+            .canvas-container {
+                width: 100%;
+                border-radius: 15px;
+                margin: 10px;
+            }
+
+            #canvas {
+                border-radius: 15px;
+            }
+
+            .node {
+                width: 60px;
+                height: 60px;
+                font-size: 18px;
+            }
+
+            .controls {
+                bottom: 10px;
+                right: 10px;
+                flex-direction: column;
+            }
+
+            .control-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 16px;
+            }
+
+            .preview-content {
+                padding: 20px;
+                margin: 20px;
+            }
+
+            .content-info {
+                position: relative;
+                max-width: 100%;
+                margin: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .node {
+                width: 50px;
+                height: 50px;
+                font-size: 16px;
+            }
+
+            .toolbar {
+                width: 200px;
+            }
+        }
+
+        /* Animations */
+        @keyframes nodeAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .node {
+            animation: nodeAppear 0.5s ease-out;
+        }
+
+        @keyframes connectionDraw {
+            from {
+                width: 0;
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .connection {
+            animation: connectionDraw 0.3s ease-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .node.selected {
+            animation: pulse 1s infinite;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 3000;
+            font-weight: 500;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .notification.success {
+            background: #28a745;
+            color: white;
+        }
+
+        .notification.error {
+            background: #dc3545;
+            color: white;
+        }
+
+        .notification.info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="toolbar-toggle" id="toolbarToggle"><i class="fas fa-bars"></i></button>
+        
+        <div class="toolbar" id="toolbar">
+            <button class="node-btn photo-btn" data-type="photo">
+                <i class="fas fa-camera"></i> Photo
+            </button>
+            <div class="upload-area" id="photoUpload">
+                <input type="file" class="file-input" id="photoInput" accept="image/*">
+                <p><i class="fas fa-cloud-upload-alt"></i> Drop image here or click to browse</p>
+            </div>
+            
+            <button class="node-btn audio-btn" data-type="audio">
+                <i class="fas fa-music"></i> Audio
+            </button>
+            <div class="upload-area" id="audioUpload">
+                <input type="file" class="file-input" id="audioInput" accept="audio/*">
+                <p><i class="fas fa-cloud-upload-alt"></i> Drop audio here or click to browse</p>
+            </div>
+            
+            <button class="node-btn video-btn" data-type="video">
+                <i class="fas fa-video"></i> Video
+            </button>
+            <div class="upload-area" id="videoUpload">
+                <input type="file" class="file-input" id="videoInput" accept="video/*">
+                <p><i class="fas fa-cloud-upload-alt"></i> Drop video here or click to browse</p>
+            </div>
+            
+            <button class="node-btn text-btn" data-type="text">
+                <i class="fas fa-file-alt"></i> Text
+            </button>
+            <div class="text-input-area" id="textInput">
+                <textarea class="text-input" id="textContent" placeholder="Enter your text content here..."></textarea>
+                <button class="add-content-btn" id="addText"><i class="fas fa-plus"></i> Add Text Node</button>
+            </div>
+            
+            <button class="node-btn number-btn" data-type="number">
+                <i class="fas fa-calculator"></i> Number
+            </button>
+            <div class="text-input-area" id="numberInput">
+                <input type="number" class="number-input" id="numberContent" placeholder="Enter a number...">
+                <button class="add-content-btn" id="addNumber"><i class="fas fa-plus"></i> Add Number Node</button>
+            </div>
+            
+            <button class="node-btn save-btn" id="saveProject">
+                <i class="fas fa-download"></i> Export Project
+            </button>
+            
+            <button class="node-btn load-btn" id="loadProject">
+                <i class="fas fa-upload"></i> Import Project
+            </button>
+            <input type="file" id="projectFileInput" accept=".json" style="display: none;">
+            
+            <button class="node-btn clear-btn" id="clearAll">
+                <i class="fas fa-trash-alt"></i> Clear All
+            </button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="content-info" id="contentInfo">
+            <h3>Node Content</h3>
+            <div id="contentDetails"></div>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn delete-btn" id="deleteSelected" title="Delete Selected Node"><i class="fas fa-trash"></i></button>
+            <button class="control-btn" id="zoomIn" title="Zoom In"><i class="fas fa-plus"></i></button>
+            <button class="control-btn" id="zoomOut" title="Zoom Out"><i class="fas fa-minus"></i></button>
+            <button class="control-btn" id="resetView" title="Reset View"><i class="fas fa-home"></i></button>
+        </div>
+    </div>
+
+    <div class="preview-modal" id="previewModal">
+        <button class="close-btn" id="closePreview"><i class="fas fa-times"></i></button>
+        <div class="preview-content" id="previewContent">
+            <!-- Dynamic content will be inserted here -->
+        </div>
+    </div>
+
+    <div class="delete-indicator" id="deleteIndicator">
+        <i class="fas fa-trash"></i> Press Delete or Backspace to remove selected node
+    </div>
+
+    <script>
+        class MediaVisualizationTool {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.nodes = [];
+                this.connections = [];
+                this.scale = 1;
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.isDragging = false;
+                this.dragNode = null;
+                this.isPanning = false;
+                this.lastPanPoint = null;
+                this.isConnecting = false;
+                this.connectStartNode = null;
+                this.selectedNode = null;
+                this.fileDataStorage = new Map(); // Store file data in memory
+                
+                this.init();
+                this.setupEventListeners();
+                this.resizeCanvas();
+                this.animate();
+            }
+
+            init() {
+                // Set initial canvas size
+                window.addEventListener('resize', () => this.resizeCanvas());
+                
+                // Mobile toolbar toggle
+                const toolbarToggle = document.getElementById('toolbarToggle');
+                const toolbar = document.getElementById('toolbar');
+                
+                toolbarToggle.addEventListener('click', () => {
+                    toolbar.classList.toggle('mobile-hidden');
+                });
+
+                // Keyboard event listener for deletion
+                document.addEventListener('keydown', (e) => {
+                    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedNode) {
+                        e.preventDefault();
+                        this.deleteNode(this.selectedNode);
+                    }
+                });
+            }
+
+            resizeCanvas() {
+                const container = this.canvas.parentElement;
+                this.canvas.width = container.clientWidth;
+                this.canvas.height = container.clientHeight;
+            }
+
+            setupEventListeners() {
+                // Node creation buttons - now toggle upload areas
+                document.querySelectorAll('.node-btn:not(.clear-btn):not(.save-btn):not(.load-btn)').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const type = e.currentTarget.dataset.type;
+                        this.toggleUploadArea(type);
+                    });
+                });
+
+                // File upload handlers
+                this.setupFileUploads();
+
+                // Text and number input handlers
+                document.getElementById('addText').addEventListener('click', () => {
+                    const textContent = document.getElementById('textContent').value.trim();
+                    if (textContent) {
+                        this.addNode('text', textContent);
+                        document.getElementById('textContent').value = '';
+                        this.toggleUploadArea('text');
+                    }
+                });
+
+                document.getElementById('addNumber').addEventListener('click', () => {
+                    const numberContent = document.getElementById('numberContent').value;
+                    if (numberContent !== '') {
+                        this.addNode('number', parseFloat(numberContent));
+                        document.getElementById('numberContent').value = '';
+                        this.toggleUploadArea('number');
+                    }
+                });
+
+                // Storage buttons - now using file export/import
+                document.getElementById('saveProject').addEventListener('click', () => {
+                    this.exportProject();
+                });
+
+                document.getElementById('loadProject').addEventListener('click', () => {
+                    document.getElementById('projectFileInput').click();
+                });
+
+                document.getElementById('projectFileInput').addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.importProject(file);
+                    }
+                });
+
+                // Clear all button
+                document.getElementById('clearAll').addEventListener('click', () => {
+                    this.clearAll();
+                });
+
+                // Delete selected node button
+                document.getElementById('deleteSelected').addEventListener('click', () => {
+                    if (this.selectedNode) {
+                        this.deleteNode(this.selectedNode);
+                    }
+                });
+
+                // Canvas interactions
+                this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+                this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+                this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+                this.canvas.addEventListener('wheel', this.handleWheel.bind(this));
+                this.canvas.addEventListener('dblclick', this.handleDoubleClick.bind(this));
+
+                // Touch events for mobile
+                this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this));
+                this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this));
+                this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this));
+
+                // Control buttons
+                document.getElementById('zoomIn').addEventListener('click', () => this.zoom(1.2));
+                document.getElementById('zoomOut').addEventListener('click', () => this.zoom(0.8));
+                document.getElementById('resetView').addEventListener('click', () => this.resetView());
+
+                // Preview modal
+                document.getElementById('closePreview').addEventListener('click', () => {
+                    document.getElementById('previewModal').style.display = 'none';
+                });
+            }
+
+            addNode(type, content = null, fileData = null) {
+                const icons = {
+                    photo: '📷',
+                    audio: '🎵',
+                    video: '🎬',
+                    text: '📝',
+                    number: '🔢'
+                };
+
+                const colors = {
+                    photo: '#ff6b6b',
+                    audio: '#4ecdc4',
+                    video: '#45b7d1',
+                    text: '#f093fb',
+                    number: '#4facfe'
+                };
+
+                const nodeId = Date.now() + Math.random();
+                
+                const node = {
+                    id: nodeId,
+                    type: type,
+                    x: (this.canvas.width / 2 - this.offsetX) / this.scale + Math.random() * 100 - 50,
+                    y: (this.canvas.height / 2 - this.offsetY) / this.scale + Math.random() * 100 - 50,
+                    icon: icons[type],
+                    color: colors[type],
+                    radius: 30,
+                    content: content || this.getDefaultContent(type),
+                    hasFile: !!fileData
+                };
+
+                // Store file data separately if provided
+                if (fileData) {
+                    this.fileDataStorage.set(nodeId, {
+                        file: fileData,
+                        url: URL.createObjectURL(fileData)
+                    });
+                }
+
+                this.nodes.push(node);
+                this.showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} node added!`, 'success');
+            }
+
+            selectNode(node) {
+                // Deselect all nodes first
+                this.nodes.forEach(n => n.selected = false);
+                
+                // Select the clicked node
+                if (node) {
+                    node.selected = true;
+                    this.selectedNode = node;
+                    this.showContentInfo(node);
+                } else {
+                    this.selectedNode = null;
+                    this.hideContentInfo();
+                }
+            }
+
+            showContentInfo(node) {
+                const contentInfo = document.getElementById('contentInfo');
+                const contentDetails = document.getElementById('contentDetails');
+                
+                let detailsHTML = `<strong>Type:</strong> ${node.type.charAt(0).toUpperCase() + node.type.slice(1)}<br>`;
+                
+                if (node.hasFile) {
+                    const fileData = this.fileDataStorage.get(node.id);
+                    if (fileData) {
+                        detailsHTML += `<strong>File:</strong> ${fileData.file.name}<br>`;
+                        detailsHTML += `<strong>Size:</strong> ${(fileData.file.size / 1024 / 1024).toFixed(2)} MB<br>`;
+                        detailsHTML += `<strong>Type:</strong> ${fileData.file.type}<br>`;
+                    }
+                }
+                
+                detailsHTML += `<div class="content-preview"><strong>Content:</strong><br>${this.truncateText(String(node.content), 100)}</div>`;
+                
+                contentDetails.innerHTML = detailsHTML;
+                contentInfo.classList.add('show');
+            }
+
+            hideContentInfo() {
+                document.getElementById('contentInfo').classList.remove('show');
+            }
+
+            truncateText(text, maxLength) {
+                if (text.length <= maxLength) return text;
+                return text.substring(0, maxLength) + '...';
+            }
+
+            deleteNode(node) {
+                // Clean up file data
+                if (node.hasFile && this.fileDataStorage.has(node.id)) {
+                    const fileData = this.fileDataStorage.get(node.id);
+                    URL.revokeObjectURL(fileData.url);
+                    this.fileDataStorage.delete(node.id);
+                }
+                
+                // Remove the node from the array
+                this.nodes = this.nodes.filter(n => n.id !== node.id);
+                
+                // Remove all connections involving this node
+                this.connections = this.connections.filter(conn => 
+                    conn.startNode.id !== node.id && conn.endNode.id !== node.id
+                );
+                
+                // Clear selection
+                this.selectedNode = null;
+                this.hideContentInfo();
+                
+                this.showNotification('Node deleted!', 'info');
+            }
+
+            exportProject() {
+                try {
+                    const projectData = {
+                        timestamp: new Date().toISOString(),
+                        nodes: this.nodes.map(node => ({
+                            id: node.id,
+                            type: node.type,
+                            x: node.x,
+                            y: node.y,
+                            content: node.content,
+                            hasFile: node.hasFile
+                        })),
+                        connections: this.connections.map(conn => ({
+                            id: conn.id,
+                            startNodeId: conn.startNode.id,
+                            endNodeId: conn.endNode.id
+                        })),
+                        viewport: {
+                            scale: this.scale,
+                            offsetX: this.offsetX,
+                            offsetY: this.offsetY
+                        }
+                    };
+                    
+                    const dataStr = JSON.stringify(projectData, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(dataBlob);
+                    link.download = `media-viz-project-${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    
+                    this.showNotification('Project exported successfully!', 'success');
+                } catch (error) {
+                    console.error('Export failed:', error);
+                    this.showNotification('Export failed: ' + error.message, 'error');
+                }
+            }
+
+            importProject(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const projectData = JSON.parse(e.target.result);
+                        
+                        // Clear current state
+                        this.clearAll();
+                        
+                        // Restore nodes
+                        this.nodes = projectData.nodes.map(nodeData => ({
+                            id: nodeData.id,
+                            type: nodeData.type,
+                            x: nodeData.x,
+                            y: nodeData.y,
+                            icon: this.getIcon(nodeData.type),
+                            color: this.getColor(nodeData.type),
+                            radius: 30,
+                            content: nodeData.content,
+                            hasFile: nodeData.hasFile || false
+                        }));
+                        
+                        // Restore connections
+                        this.connections = projectData.connections.map(connData => {
+                            const startNode = this.nodes.find(n => n.id === connData.startNodeId);
+                            const endNode = this.nodes.find(n => n.id === connData.endNodeId);
+                            return {
+                                id: connData.id,
+                                startNode: startNode,
+                                endNode: endNode
+                            };
+                        }).filter(conn => conn.startNode && conn.endNode);
+                        
+                        // Restore viewport
+                        if (projectData.viewport) {
+                            this.scale = projectData.viewport.scale;
+                            this.offsetX = projectData.viewport.offsetX;
+                            this.offsetY = projectData.viewport.offsetY;
+                        }
+                        
+                        this.showNotification('Project imported successfully!', 'success');
+                    } catch (error) {
+                        console.error('Import failed:', error);
+                        this.showNotification('Import failed: Invalid project file', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                const colors = {
+                    success: '#28a745',
+                    error: '#dc3545',
+                    info: '#17a2b8'
+                };
+                
+                notification.className = `notification ${type}`;
+                notification.style.background = colors[type];
+                notification.innerHTML = message;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.remove();
+                }, 3000);
+            }
+
+            toggleUploadArea(type) {
+                // Hide all upload areas first
+                document.querySelectorAll('.upload-area, .text-input-area').forEach(area => {
+                    area.classList.remove('active');
+                });
+
+                // Show the selected upload area
+                const uploadArea = document.getElementById(`${type}Upload`) || 
+                                 document.getElementById(`${type}Input`);
+                if (uploadArea) {
+                    uploadArea.classList.toggle('active');
+                }
+            }
+
+            setupFileUploads() {
+                const types = ['photo', 'audio', 'video'];
+                
+                types.forEach(type => {
+                    const uploadArea = document.getElementById(`${type}Upload`);
+                    const fileInput = document.getElementById(`${type}Input`);
+                    
+                    // Click to browse
+                    uploadArea.addEventListener('click', () => {
+                        fileInput.click();
+                    });
+                    
+                    // File selection
+                    fileInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            this.handleFileUpload(file, type);
+                        }
+                    });
+                    
+                    // Drag and drop
+                    uploadArea.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        uploadArea.classList.add('dragover');
+                    });
+                    
+                    uploadArea.addEventListener('dragleave', () => {
+                        uploadArea.classList.remove('dragover');
+                    });
+                    
+                    uploadArea.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        uploadArea.classList.remove('dragover');
+                        const file = e.dataTransfer.files[0];
+                        if (file) {
+                            this.handleFileUpload(file, type);
+                        }
+                    });
+                });
+            }
+
+            handleFileUpload(file, type) {
+                // Validate file type
+                if (!this.validateFileType(file, type)) {
+                    this.showNotification(`Please select a valid ${type} file.`, 'error');
+                    return;
+                }
+
+                // Add node with file data
+                this.addNode(type, file.name, file);
+                
+                // Hide upload area
+                this.toggleUploadArea(type);
+            }
+
+            validateFileType(file, type) {
+                const validTypes = {
+                    photo: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+                    audio: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/mp3'],
+                    video: ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/quicktime']
+                };
+
+                return validTypes[type].some(validType => 
+                    file.type === validType || file.type.startsWith(`${type}/`)
+                );
+            }
+
+            getIcon(type) {
+                const icons = {
+                    photo: 'fas fa-camera',
+                    audio: 'fas fa-music', 
+                    video: 'fas fa-video',
+                    text: 'fas fa-file-alt',
+                    number: 'fas fa-calculator'
+                };
+                return icons[type];
+            }
+
+            getColor(type) {
+                return '#333333';
+            }
+
+            getDefaultContent(type) {
+                const contents = {
+                    photo: 'Sample image content',
+                    audio: 'Audio track placeholder',
+                    video: 'Video content preview',
+                    text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
+                    number: Math.floor(Math.random() * 1000)
+                };
+                return contents[type];
+            }
+
+            clearAll() {
+                // Clean up file URLs before clearing
+                this.fileDataStorage.forEach((fileData) => {
+                    URL.revokeObjectURL(fileData.url);
+                });
+                this.fileDataStorage.clear();
+                
+                this.nodes = [];
+                this.connections = [];
+                this.selectedNode = null;
+                this.hideDeleteIndicator();
+                this.hideContentInfo();
+                this.showNotification('All content cleared!', 'info');
+            }
+
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: (e.clientX - rect.left - this.offsetX) / this.scale,
+                    y: (e.clientY - rect.top - this.offsetY) / this.scale
+                };
+            }
+
+            getTouchPos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const touch = e.touches[0] || e.changedTouches[0];
+                return {
+                    x: (touch.clientX - rect.left - this.offsetX) / this.scale,
+                    y: (touch.clientY - rect.top - this.offsetY) / this.scale
+                };
+            }
+
+            getNodeAt(pos) {
+                for (let node of this.nodes) {
+                    const dx = pos.x - node.x;
+                    const dy = pos.y - node.y;
+                    if (dx * dx + dy * dy < node.radius * node.radius) {
+                        return node;
+                    }
+                }
+                return null;
+            }
+
+            handleMouseDown(e) {
+                const pos = this.getMousePos(e);
+                const node = this.getNodeAt(pos);
+                
+                if (e.shiftKey && node) {
+                    e.preventDefault();
+                    if (!this.isConnecting) {
+                        this.isConnecting = true;
+                        this.connectStartNode = node;
+                        node.connecting = true;
+                        this.canvas.style.cursor = 'crosshair';
+                        this.showNotification('Click another node to connect!', 'info');
+                    } else if (this.connectStartNode && node !== this.connectStartNode) {
+                        this.addConnection(this.connectStartNode, node);
+                        this.connectStartNode.connecting = false;
+                        this.isConnecting = false;
+                        this.connectStartNode = null;
+                        this.canvas.style.cursor = 'grab';
+                    }
+                    return;
+                }
+
+                if (this.isConnecting) {
+                    this.connectStartNode.connecting = false;
+                    this.isConnecting = false;
+                    this.connectStartNode = null;
+                    this.canvas.style.cursor = 'grab';
+                    return;
+                }
+                
+                if (node) {
+                    this.selectNode(node);
+                    this.isDragging = true;
+                    this.dragNode = node;
+                    this.canvas.style.cursor = 'grabbing';
+                } else {
+                    this.selectNode(null);
+                    this.isPanning = true;
+                    this.lastPanPoint = { x: e.clientX, y: e.clientY };
+                    this.canvas.style.cursor = 'grabbing';
+                }
+            }
+
+            handleMouseMove(e) {
+                if (this.isDragging && this.dragNode) {
+                    const pos = this.getMousePos(e);
+                    this.dragNode.x = pos.x;
+                    this.dragNode.y = pos.y;
+                } else if (this.isPanning) {
+                    const deltaX = e.clientX - this.lastPanPoint.x;
+                    const deltaY = e.clientY - this.lastPanPoint.y;
+                    this.offsetX += deltaX;
+                    this.offsetY += deltaY;
+                    this.lastPanPoint = { x: e.clientX, y: e.clientY };
+                }
+            }
+
+            handleMouseUp(e) {
+                this.isDragging = false;
+                this.dragNode = null;
+                this.isPanning = false;
+                
+                if (!this.isConnecting) {
+                    this.canvas.style.cursor = 'grab';
+                }
+            }
+
+            handleTouchStart(e) {
+                e.preventDefault();
+                
+                // Check for two-finger touch (connection mode)
+                if (e.touches.length === 2) {
+                    const pos1 = this.getTouchPos(e);
+                    const node1 = this.getNodeAt(pos1);
+                    
+                    const touch2 = e.touches[1];
+                    const rect = this.canvas.getBoundingClientRect();
+                    const pos2 = {
+                        x: (touch2.clientX - rect.left - this.offsetX) / this.scale,
+                        y: (touch2.clientY - rect.top - this.offsetY) / this.scale
+                    };
+                    const node2 = this.getNodeAt(pos2);
+                    
+                    if (node1 && node2 && node1 !== node2) {
+                        this.addConnection(node1, node2);
+                    }
+                    return;
+                }
+                
+                const pos = this.getTouchPos(e);
+                const node = this.getNodeAt(pos);
+                
+                if (node) {
+                    this.selectNode(node);
+                    this.isDragging = true;
+                    this.dragNode = node;
+                } else {
+                    this.selectNode(null);
+                    this.isPanning = true;
+                    const touch = e.touches[0];
+                    this.lastPanPoint = { x: touch.clientX, y: touch.clientY };
+                }
+            }
+
+            handleTouchMove(e) {
+                e.preventDefault();
+                
+                if (this.isDragging && this.dragNode) {
+                    const pos = this.getTouchPos(e);
+                    this.dragNode.x = pos.x;
+                    this.dragNode.y = pos.y;
+                } else if (this.isPanning) {
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - this.lastPanPoint.x;
+                    const deltaY = touch.clientY - this.lastPanPoint.y;
+                    this.offsetX += deltaX;
+                    this.offsetY += deltaY;
+                    this.lastPanPoint = { x: touch.clientX, y: touch.clientY };
+                }
+            }
+
+            handleTouchEnd(e) {
+                e.preventDefault();
+                this.isDragging = false;
+                this.dragNode = null;
+                this.isPanning = false;
+            }
+
+            handleWheel(e) {
+                e.preventDefault();
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                this.zoom(zoomFactor, e.clientX, e.clientY);
+            }
+
+            handleDoubleClick(e) {
+                const pos = this.getMousePos(e);
+                const node = this.getNodeAt(pos);
+                
+                if (node) {
+                    this.showPreview(node);
+                }
+            }
+
+            zoom(factor, centerX = null, centerY = null) {
+                const oldScale = this.scale;
+                this.scale = Math.max(0.5, Math.min(3, this.scale * factor));
+                
+                if (centerX !== null && centerY !== null) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mouseX = centerX - rect.left;
+                    const mouseY = centerY - rect.top;
+                    
+                    this.offsetX = mouseX - (mouseX - this.offsetX) * (this.scale / oldScale);
+                    this.offsetY = mouseY - (mouseY - this.offsetY) * (this.scale / oldScale);
+                }
+            }
+
+            resetView() {
+                this.scale = 1;
+                this.offsetX = 0;
+                this.offsetY = 0;
+            }
+
+            addConnection(startNode, endNode) {
+                const connection = {
+                    id: Date.now(),
+                    startNode: startNode,
+                    endNode: endNode
+                };
+                
+                // Check if connection already exists
+                const exists = this.connections.some(conn => 
+                    (conn.startNode === startNode && conn.endNode === endNode) ||
+                    (conn.startNode === endNode && conn.endNode === startNode)
+                );
+                
+                if (!exists) {
+                    this.connections.push(connection);
+                    this.showNotification('Nodes connected!', 'success');
+                }
+            }
+
+            showPreview(node) {
+                const modal = document.getElementById('previewModal');
+                const content = document.getElementById('previewContent');
+                
+                let previewHTML = '';
+                const fileData = this.fileDataStorage.get(node.id);
+                
+                switch (node.type) {
+                    case 'photo':
+                        if (fileData) {
+                            previewHTML = `
+                                <h2><i class="fas fa-camera"></i> Photo Preview</h2>
+                                <img src="${fileData.url}" style="max-width: 100%; max-height: 500px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin: 20px 0;" alt="Uploaded image">
+                                <div style="text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                                    <p><strong><i class="fas fa-file"></i> Filename:</strong> ${fileData.file.name}</p>
+                                    <p><strong><i class="fas fa-hdd"></i> Size:</strong> ${(fileData.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    <p><strong><i class="fas fa-image"></i> Type:</strong> ${fileData.file.type}</p>
+                                    <p><strong><i class="fas fa-calendar"></i> Added:</strong> ${new Date(fileData.file.lastModified).toLocaleString()}</p>
+                                </div>
+                            `;
+                        } else {
+                            previewHTML = `
+                                <h2><i class="fas fa-camera"></i> Photo Node</h2>
+                                <div style="width: 200px; height: 150px; background: linear-gradient(45deg, #ff6b6b, #ee5a6f); border-radius: 10px; margin: 20px auto; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;"><i class="fas fa-camera"></i></div>
+                                <div class="content-preview">${node.content}</div>
+                            `;
+                        }
+                        break;
+                    case 'audio':
+                        if (fileData) {
+                            previewHTML = `
+                                <h2><i class="fas fa-music"></i> Audio Preview</h2>
+                                <div style="background: linear-gradient(45deg, #4ecdc4, #44a08d); border-radius: 15px; padding: 30px; margin: 20px 0;">
+                                    <audio controls style="width: 100%; max-width: 400px;" autoplay="false">
+                                        <source src="${fileData.url}" type="${fileData.file.type}">
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                </div>
+                                <div style="text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                    <p><strong><i class="fas fa-file"></i> Filename:</strong> ${fileData.file.name}</p>
+                                    <p><strong><i class="fas fa-hdd"></i> Size:</strong> ${(fileData.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    <p><strong><i class="fas fa-music"></i> Type:</strong> ${fileData.file.type}</p>
+                                    <p><strong><i class="fas fa-calendar"></i> Added:</strong> ${new Date(fileData.file.lastModified).toLocaleString()}</p>
+                                </div>
+                            `;
+                        } else {
+                            previewHTML = `
+                                <h2><i class="fas fa-music"></i> Audio Node</h2>
+                                <div style="width: 250px; height: 80px; background: linear-gradient(45deg, #4ecdc4, #44a08d); border-radius: 10px; margin: 20px auto; display: flex; align-items: center; justify-content: center; color: white;"><i class="fas fa-music"></i></div>
+                                <div class="content-preview">${node.content}</div>
+                            `;
+                        }
+                        break;
+                    case 'video':
+                        if (fileData) {
+                            previewHTML = `
+                                <h2><i class="fas fa-video"></i> Video Preview</h2>
+                                <video controls style="max-width: 100%; max-height: 400px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin: 20px 0;" preload="metadata">
+                                    <source src="${fileData.url}" type="${fileData.file.type}">
+                                    Your browser does not support the video tag.
+                                </video>
+                                <div style="text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                    <p><strong><i class="fas fa-file"></i> Filename:</strong> ${fileData.file.name}</p>
+                                    <p><strong><i class="fas fa-hdd"></i> Size:</strong> ${(fileData.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    <p><strong><i class="fas fa-video"></i> Type:</strong> ${fileData.file.type}</p>
+                                    <p><strong><i class="fas fa-calendar"></i> Added:</strong> ${new Date(fileData.file.lastModified).toLocaleString()}</p>
+                                </div>
+                            `;
+                        } else {
+                            previewHTML = `
+                                <h2><i class="fas fa-video"></i> Video Node</h2>
+                                <div style="width: 300px; height: 200px; background: linear-gradient(45deg, #45b7d1, #96c93d); border-radius: 10px; margin: 20px auto; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;"><i class="fas fa-play"></i></div>
+                                <div class="content-preview">${node.content}</div>
+                            `;
+                        }
+                        break;
+                    case 'text':
+                        previewHTML = `
+                            <h2><i class="fas fa-file-alt"></i> Text Content</h2>
+                            <div style="text-align: left; padding: 25px; background: #f8f9fa; border-radius: 10px; margin: 20px 0; max-height: 400px; overflow-y: auto; border-left: 4px solid #f093fb;">
+                                <div style="white-space: pre-wrap; font-family: Georgia, serif; line-height: 1.6; color: #333;">${node.content}</div>
+                            </div>
+                            <div style="display: flex; gap: 20px; justify-content: center; color: #666; font-size: 14px; margin-top: 15px;">
+                                <span><i class="fas fa-text-width"></i> Characters: ${node.content.length}</span>
+                                <span><i class="fas fa-align-left"></i> Words: ${node.content.split(/\s+/).filter(w => w.length > 0).length}</span>
+                                <span><i class="fas fa-paragraph"></i> Lines: ${node.content.split('\n').length}</span>
+                            </div>
+                        `;
+                        break;
+                    case 'number':
+                        const num = node.content;
+                        const isInteger = Number.isInteger(num);
+                        const isPositive = num > 0;
+                        const isNegative = num < 0;
+                        const isZero = num === 0;
+                        
+                        previewHTML = `
+                            <h2><i class="fas fa-calculator"></i> Number Analysis</h2>
+                            <div style="font-size: 64px; color: #4facfe; margin: 30px 0; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.1);">${num}</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; text-align: left;">
+                                <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
+                                    <strong><i class="fas fa-info-circle"></i> Type:</strong><br>
+                                    ${isInteger ? 'Integer' : 'Decimal'}
+                                </div>
+                                <div style="background: #f3e5f5; padding: 15px; border-radius: 8px;">
+                                    <strong><i class="fas fa-chart-line"></i> Sign:</strong><br>
+                                    ${isPositive ? 'Positive (+)' : isNegative ? 'Negative (-)' : 'Zero (0)'}
+                                </div>
+                                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px;">
+                                    <strong><i class="fas fa-square-root-alt"></i> Square:</strong><br>
+                                    ${(num * num).toLocaleString()}
+                                </div>
+                                <div style="background: #fff3e0; padding: 15px; border-radius: 8px;">
+                                    <strong><i class="fas fa-percentage"></i> Absolute:</strong><br>
+                                    ${Math.abs(num).toLocaleString()}
+                                </div>
+                            </div>
+                        `;
+                        break;
+                }
+                
+                content.innerHTML = previewHTML;
+                modal.style.display = 'flex';
+            }
+
+            showDeleteIndicator() {
+                const indicator = document.getElementById('deleteIndicator');
+                indicator.style.display = 'block';
+                setTimeout(() => {
+                    indicator.style.display = 'none';
+                }, 3000);
+            }
+
+            hideDeleteIndicator() {
+                document.getElementById('deleteIndicator').style.display = 'none';
+            }
+
+            draw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.save();
+                this.ctx.translate(this.offsetX, this.offsetY);
+                this.ctx.scale(this.scale, this.scale);
+                
+                // Draw connections
+                this.connections.forEach(conn => {
+                    this.drawConnection(conn);
+                });
+                
+                // Draw nodes
+                this.nodes.forEach(node => {
+                    this.drawNode(node);
+                });
+                
+                this.ctx.restore();
+            }
+
+            drawNode(node) {
+                // Draw node circle - clean white with black border
+                this.ctx.beginPath();
+                this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'white';
+                this.ctx.fill();
+                
+                // Draw border (red if selected, blue if connecting, black if normal)
+                if (node.selected) {
+                    this.ctx.strokeStyle = '#ff4757';
+                    this.ctx.lineWidth = 3;
+                } else if (node.connecting) {
+                    this.ctx.strokeStyle = '#007bff';
+                    this.ctx.lineWidth = 3;
+                } else {
+                    this.ctx.strokeStyle = '#333333';
+                    this.ctx.lineWidth = 2;
+                }
+                this.ctx.stroke();
+                
+                // Draw Font Awesome icon using Unicode
+                this.ctx.fillStyle = '#333333';
+                this.ctx.font = 'bold 16px "Font Awesome 6 Free"';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                
+                const iconMap = {
+                    photo: '\uf030', // fa-camera
+                    audio: '\uf001', // fa-music
+                    video: '\uf03d', // fa-video
+                    text: '\uf15c',  // fa-file-alt
+                    number: '\uf1ec' // fa-calculator
+                };
+                
+                this.ctx.fillText(iconMap[node.type], node.x, node.y);
+                
+                // Draw blue file indicator if it has a file
+                if (node.hasFile) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(node.x + 20, node.y - 20, 5, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#007bff';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = 'white';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw content preview text below node
+                if (node.content && node.content.toString().length > 0) {
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    this.ctx.fillRect(node.x - 40, node.y + 35, 80, 20);
+                    this.ctx.strokeStyle = '#333';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.strokeRect(node.x - 40, node.y + 35, 80, 20);
+                    
+                    this.ctx.fillStyle = '#333';
+                    this.ctx.font = '10px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    
+                    const truncated = this.truncateText(String(node.content), 12);
+                    this.ctx.fillText(truncated, node.x, node.y + 45);
+                }
+            }
+
+            drawConnection(connection) {
+                const start = connection.startNode;
+                const end = connection.endNode;
+                
+                // Draw clean blue connection line
+                this.ctx.beginPath();
+                this.ctx.moveTo(start.x, start.y);
+                this.ctx.lineTo(end.x, end.y);
+                this.ctx.strokeStyle = '#007bff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                
+                // Draw arrow at the end
+                const angle = Math.atan2(end.y - start.y, end.x - start.x);
+                const arrowLength = 10;
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(end.x, end.y);
+                this.ctx.lineTo(
+                    end.x - arrowLength * Math.cos(angle - Math.PI / 6),
+                    end.y - arrowLength * Math.sin(angle - Math.PI / 6)
+                );
+                this.ctx.moveTo(end.x, end.y);
+                this.ctx.lineTo(
+                    end.x - arrowLength * Math.cos(angle + Math.PI / 6),
+                    end.y - arrowLength * Math.sin(angle + Math.PI / 6)
+                );
+                this.ctx.strokeStyle = '#007bff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+
+            animate() {
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new MediaVisualizationTool();
+        });
+
+        // Add instructions overlay
+        setTimeout(() => {
+            const instructions = document.createElement('div');
+            instructions.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                color: #333;
+                padding: 30px;
+                border-radius: 12px;
+                text-align: center;
+                z-index: 3000;
+                max-width: 90%;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+                border: 1px solid #dee2e6;
+            `;
+            instructions.innerHTML = `
+                <h2 style="color: #333; margin-bottom: 20px;"><i class="fas fa-magic"></i> Enhanced Media Visualization Tool</h2>
+                <div style="text-align: left; color: #666; line-height: 1.6;">
+                    <p><strong><i class="fas fa-upload"></i> Adding Content:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>Click media buttons to upload files or add text/numbers</li>
+                        <li>Drag and drop files into upload areas</li>
+                        <li>Your content will be visible on nodes and in previews</li>
+                    </ul>
+                    <p><strong><i class="fas fa-mouse"></i> Interaction:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>Click nodes to select them (shows content info)</li>
+                        <li>Double-click nodes to see full preview with media playback</li>
+                        <li>Drag nodes to move them around</li>
+                        <li>Hold Shift + click two nodes to connect them</li>
+                    </ul>
+                    <p><strong><i class="fas fa-keyboard"></i> Controls:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>Delete/Backspace: Remove selected node</li>
+                        <li>Mouse wheel: Zoom in/out</li>
+                        <li>Export/Import: Save your work as JSON file</li>
+                    </ul>
+                </div>
+                <button onclick="this.parentElement.remove()" style="
+                    background: #007bff;
+                    color: white;
+                    border: 1px solid #007bff;
+                    padding: 12px 24px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    margin-top: 20px;
+                    transition: all 0.2s ease;
+                " onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">
+                    <i class="fas fa-rocket"></i> Start Creating!
+                </button>
+            `;
+            document.body.appendChild(instructions);
+        }, 1000);
+    </script>
+</body>
+</html>
